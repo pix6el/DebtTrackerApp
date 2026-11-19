@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import '../data/db_helper.dart';
 import '../models/debt_model.dart';
 import '../utils/formatters.dart';
+import 'about_screen.dart';
 import 'debt_detail_screen.dart';
 import 'monthly_plan_screen.dart';
+import 'settings_screen.dart';
 
 enum DebtFilter { all, owe, owed, settled }
 
@@ -259,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final netBalance = _totalOwed - _totalOwe;
 
     return Scaffold(
+      drawer: _buildSidebar(colorScheme),
       appBar: AppBar(
         title: Text(
           _selectedTab == 0 ? 'Debt Tracker' : 'Monthly Plan',
@@ -655,6 +658,203 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _openAboutScreen(int initialTab) {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AboutScreen(initialTab: initialTab),
+      ),
+    );
+  }
+
+  void _openSettingsScreen() {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SettingsScreen(),
+      ),
+    );
+  }
+
+  Widget _buildSidebar(ColorScheme colorScheme) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              margin: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary,
+                    colorScheme.primaryContainer.withAlpha(220),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MYR Debt Tracker',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Offline Ringgit Manager',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onPrimary.withAlpha(215),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _buildDrawerTile(
+                    icon: Icons.account_balance_wallet_outlined,
+                    selectedIcon: Icons.account_balance_wallet_rounded,
+                    label: 'Debts',
+                    selected: _selectedTab == 0,
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() => _selectedTab = 0);
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerTile(
+                    icon: Icons.donut_large_outlined,
+                    selectedIcon: Icons.donut_large_rounded,
+                    label: 'Monthly Plan',
+                    selected: _selectedTab == 1,
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() => _selectedTab = 1);
+                    },
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    child: Divider(height: 1),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: Text(
+                      'SETTINGS & INFO',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  _buildDrawerTile(
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings_rounded,
+                    label: 'Settings',
+                    selected: false,
+                    onTap: _openSettingsScreen,
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerTile(
+                    icon: Icons.menu_book_outlined,
+                    selectedIcon: Icons.menu_book_rounded,
+                    label: 'How to Use',
+                    selected: false,
+                    onTap: () => _openAboutScreen(0),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerTile(
+                    icon: Icons.info_outline_rounded,
+                    selectedIcon: Icons.info_rounded,
+                    label: 'About App',
+                    selected: false,
+                    onTap: () => _openAboutScreen(1),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.offline_pin_outlined,
+                    size: 16,
+                    color: colorScheme.outline,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Version 1.0.0 • 100% Offline',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile({
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      selected: selected,
+      selectedTileColor: colorScheme.secondaryContainer,
+      selectedColor: colorScheme.onSecondaryContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      leading: Icon(selected ? selectedIcon : icon),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }

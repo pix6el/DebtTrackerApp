@@ -20,7 +20,7 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -48,7 +48,44 @@ class DbHelper {
             FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE
           )
         ''');
+
+        await _createSettingsTable(db);
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createSettingsTable(db);
+        }
+      },
+    );
+  }
+
+  Future<void> _createSettingsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<String?> getSetting(String key) async {
+    final db = await database;
+    final rows = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
