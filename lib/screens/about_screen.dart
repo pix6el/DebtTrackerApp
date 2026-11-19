@@ -61,9 +61,9 @@ class _InstructionsTab extends StatelessWidget {
         const _StepCard(
           stepNumber: '1',
           icon: Icons.add_circle_outline_rounded,
-          title: 'Add Single or Installment Debts',
+          title: 'Add Single, Repeated, or Split Debts',
           description:
-              'Tap "+ Add Debt", choose "I Owe" or "Owed to Me", pick a category tag (Family, Friends, Bills, Business, etc.), and enter the amount in RM. Toggle "Split into Monthly Installments" to divide a larger debt across 2–36 monthly due dates automatically.',
+              'Tap "+ Add Debt", choose "I Owe" or "Owed to Me", pick a category tag (Family, Friends, Bills, Business, etc.), and enter the amount in RM. Turn on "Monthly Repeat / Installment" to either repeat the same amount every month (e.g., RM 200 for 6 months) or split a total across 2–36 months.',
         ),
         const SizedBox(height: 12),
         const _StepCard(

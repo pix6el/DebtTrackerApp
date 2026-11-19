@@ -11,6 +11,8 @@ import 'settings_screen.dart';
 
 enum DebtFilter { all, owe, owed, settled }
 
+enum MonthlyScheduleMode { repeatEachMonth, splitTotal }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -84,7 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
     DebtCategory selectedCategory = DebtCategory.general;
     DateTime? selectedDueDate;
     bool isInstallment = false;
-    int installmentMonths = 3;
+    MonthlyScheduleMode scheduleMode = MonthlyScheduleMode.repeatEachMonth;
+    int installmentMonths = 6;
 
     showModalBottomSheet(
       context: context,
@@ -177,10 +180,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (isInstallment) setModalState(() {});
                         },
                         decoration: InputDecoration(
-                          labelText: isInstallment
-                              ? 'Total Debt Amount (MYR)'
-                              : 'Total Amount (MYR)',
-                          helperText: 'Max RM 100,000.00',
+                          labelText: !isInstallment
+                              ? 'Total Amount (MYR)'
+                              : (scheduleMode ==
+                                      MonthlyScheduleMode.repeatEachMonth
+                                  ? 'Amount Per Month (MYR)'
+                                  : 'Total Debt Amount (MYR)'),
+                          helperText: !isInstallment
+                              ? 'Max RM 100,000.00'
+                              : (scheduleMode ==
+                                      MonthlyScheduleMode.repeatEachMonth
+                                  ? 'Repeated every month (Max RM 100,000.00/mo)'
+                                  : 'Divided across months (Max RM 100,000.00)'),
                           prefixText: 'RM ',
                           prefixIcon: const Icon(Icons.payments_outlined),
                           border: const OutlineInputBorder(),
@@ -254,14 +265,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Theme.of(ctx).colorScheme.primary,
                               ),
                               title: const Text(
-                                'Split into Monthly Installments',
+                                'Monthly Repeat / Installment',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
                               ),
                               subtitle: const Text(
-                                'Auto-schedules across future months in Monthly Plan',
+                                'Repeat the same amount or split total across months',
                                 style: TextStyle(fontSize: 12),
                               ),
                               value: isInstallment,
@@ -291,6 +302,46 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child:
+                                          SegmentedButton<MonthlyScheduleMode>(
+                                        segments: const [
+                                          ButtonSegment(
+                                            value: MonthlyScheduleMode
+                                                .repeatEachMonth,
+                                            label: Text(
+                                              'Repeat / Mo',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            icon: Icon(
+                                              Icons.repeat_rounded,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          ButtonSegment(
+                                            value:
+                                                MonthlyScheduleMode.splitTotal,
+                                            label: Text(
+                                              'Split Total',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            icon: Icon(
+                                              Icons.call_split_rounded,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ],
+                                        selected: {scheduleMode},
+                                        onSelectionChanged: (selection) {
+                                          setModalState(
+                                            () =>
+                                                scheduleMode = selection.first,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
                                     Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
@@ -377,18 +428,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                           firstDue,
                                           installmentMonths - 1,
                                         );
-                                        final perMonth = (parsed != null &&
-                                                parsed > 0)
-                                            ? Formatters.myr(
-                                                parsed / installmentMonths,
-                                              )
-                                            : 'RM 0.00';
+                                        final isRepeat = scheduleMode ==
+                                            MonthlyScheduleMode.repeatEachMonth;
+                                        final perMonthVal =
+                                            (parsed != null && parsed > 0)
+                                                ? (isRepeat
+                                                    ? parsed
+                                                    : parsed /
+                                                        installmentMonths)
+                                                : 0.0;
+                                        final grandTotalVal =
+                                            (parsed != null && parsed > 0)
+                                                ? (isRepeat
+                                                    ? parsed * installmentMonths
+                                                    : parsed)
+                                                : 0.0;
+                                        final prefix = isRepeat ? '' : '~';
                                         return Padding(
                                           padding: const EdgeInsets.only(
                                             top: 10,
                                           ),
                                           child: Text(
-                                            '$installmentMonths × ~$perMonth/month (${Formatters.monthYear(firstDue)} – ${Formatters.monthYear(lastDue)})',
+                                            '$installmentMonths × $prefix${Formatters.myr(perMonthVal)}/mo • Total ${Formatters.myr(grandTotalVal)} (${Formatters.monthYear(firstDue)} – ${Formatters.monthYear(lastDue)})',
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
@@ -476,10 +537,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 DateTime(now.year, now.month, now.day);
                             final groupId =
                                 now.microsecondsSinceEpoch.toString();
+                            final isRepeat = scheduleMode ==
+                                MonthlyScheduleMode.repeatEachMonth;
+
                             final totalCents = (totalAmount * 100).round();
-                            final baseCents = totalCents ~/ installmentMonths;
-                            final remainderCents =
-                                totalCents - (baseCents * installmentMonths);
+                            final baseCents = isRepeat
+                                ? totalCents
+                                : totalCents ~/ installmentMonths;
+                            final remainderCents = isRepeat
+                                ? 0
+                                : totalCents - (baseCents * installmentMonths);
 
                             final installments = <Debt>[];
                             for (int i = 0; i < installmentMonths; i++) {
@@ -518,9 +585,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           _loadDebts();
                         },
                         child: Text(
-                          isInstallment
-                              ? 'Save $installmentMonths Installments'
-                              : 'Save Record',
+                          !isInstallment
+                              ? 'Save Record'
+                              : (scheduleMode ==
+                                      MonthlyScheduleMode.repeatEachMonth
+                                  ? 'Save $installmentMonths Monthly Debts'
+                                  : 'Save $installmentMonths Installments'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
