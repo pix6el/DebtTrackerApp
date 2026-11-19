@@ -77,9 +77,9 @@ class _InstructionsTab extends StatelessWidget {
         const _StepCard(
           stepNumber: '3',
           icon: Icons.payments_outlined,
-          title: 'Record Partial or Full Payments',
+          title: 'Record Payments or Edit Records',
           description:
-              'Tap any debt card to open its details. Tap "Record Payment" to log partial repayments over time, or tap "Full" inside the payment field to pay off the remaining balance at once. Once paid in full, the debt is automatically marked as Settled.',
+              'Tap any debt card to open its details. Tap "Record Payment" to log partial repayments (or tap "Full" to settle at once). Need to make a change? Tap the Edit (pencil) icon in the top bar to update the name, amount, type, due date, or note.',
         ),
         const SizedBox(height: 12),
         const _StepCard(
@@ -88,6 +88,14 @@ class _InstructionsTab extends StatelessWidget {
           title: 'Use the Monthly Plan',
           description:
               'Switch to the "Monthly" tab to visualize debts you owe by due date. View the donut breakdown for This Month, Next Month, and Incoming months, check the forecast bar chart, and review overdue or undated debts.',
+        ),
+        const SizedBox(height: 12),
+        const _StepCard(
+          stepNumber: '5',
+          icon: Icons.notifications_active_outlined,
+          title: 'Customize Reminders & Theme',
+          description:
+              'Open the sidebar menu (☰) and tap "Settings" to switch between Light Mode, Dark Mode, or System Default, and configure offline due date reminders (1 day before and/or on the due date at 9:00 AM).',
         ),
         const SizedBox(height: 16),
         Container(
@@ -282,10 +290,17 @@ class _AboutTab extends StatelessWidget {
               ),
               Divider(height: 1, indent: 64),
               _FeatureTile(
+                icon: Icons.notifications_active_outlined,
+                title: 'Offline Due Date Reminders',
+                subtitle:
+                    'Automatic 9:00 AM local notifications before and on your due dates so you never miss a payment.',
+              ),
+              Divider(height: 1, indent: 64),
+              _FeatureTile(
                 icon: Icons.dark_mode_outlined,
                 title: 'Light & Dark Themes',
                 subtitle:
-                    'Designed with Material 3 to automatically match your device appearance.',
+                    'Switch between Light Mode, Dark Mode, or System Default anytime in Settings.',
               ),
             ],
           ),

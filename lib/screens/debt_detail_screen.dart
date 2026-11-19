@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../data/db_helper.dart';
 import '../models/debt_model.dart';
 import '../utils/formatters.dart';
+import '../utils/notification_service.dart';
 
 class DebtDetailScreen extends StatefulWidget {
   final int debtId;
@@ -155,6 +156,12 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                         note: noteCtrl.text.trim(),
                       );
                       await DbHelper.instance.addPayment(payment);
+                      final refreshed =
+                          await DbHelper.instance.getDebtById(widget.debtId);
+                      if (refreshed != null) {
+                        await NotificationService.instance
+                            .syncDebtReminder(refreshed);
+                      }
                       if (ctx.mounted) Navigator.pop(ctx);
                       _loadDetails();
                     },
@@ -202,8 +209,239 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
 
     if (confirmed == true) {
       await DbHelper.instance.deletePayment(payment);
+      final refreshed = await DbHelper.instance.getDebtById(widget.debtId);
+      if (refreshed != null) {
+        await NotificationService.instance.syncDebtReminder(refreshed);
+      }
       _loadDetails();
     }
+  }
+
+  void _openEditDebtSheet() {
+    final current = _debt;
+    if (current == null) return;
+
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: current.personName);
+    final amountCtrl = TextEditingController(
+      text: current.totalAmount.toStringAsFixed(2),
+    );
+    final noteCtrl = TextEditingController(text: current.note);
+    DebtType selectedType = current.type;
+    DateTime? selectedDueDate = current.dueDate;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withAlpha(100),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Edit Debt Record',
+                        style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      SegmentedButton<DebtType>(
+                        segments: const [
+                          ButtonSegment(
+                            value: DebtType.owe,
+                            label: Text('I Owe'),
+                            icon: Icon(Icons.arrow_upward_rounded),
+                          ),
+                          ButtonSegment(
+                            value: DebtType.owed,
+                            label: Text('Owed to Me'),
+                            icon: Icon(Icons.arrow_downward_rounded),
+                          ),
+                        ],
+                        selected: {selectedType},
+                        onSelectionChanged: (selection) {
+                          setModalState(() => selectedType = selection.first);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Person Name',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: amountCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          ),
+                        ],
+                        decoration: InputDecoration(
+                          labelText: 'Total Amount (MYR)',
+                          helperText: current.paidAmount > 0
+                              ? 'Already paid: ${Formatters.myr(current.paidAmount)} (Max RM 100,000.00)'
+                              : 'Max RM 100,000.00',
+                          prefixText: 'RM ',
+                          prefixIcon: const Icon(Icons.payments_outlined),
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter an amount';
+                          }
+                          final parsed = double.tryParse(value.trim());
+                          if (parsed == null || parsed <= 0) {
+                            return 'Enter a valid amount greater than 0';
+                          }
+                          if (parsed > 100000) {
+                            return 'Maximum amount is RM 100,000.00';
+                          }
+                          if (parsed + 0.009 < current.paidAmount) {
+                            return 'Cannot be less than paid (${Formatters.myr(current.paidAmount)})';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: ctx,
+                                  initialDate: selectedDueDate ??
+                                      DateTime.now().add(
+                                        const Duration(days: 7),
+                                      ),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null) {
+                                  setModalState(
+                                    () => selectedDueDate = picked,
+                                  );
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.calendar_today_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                selectedDueDate == null
+                                    ? 'Add Due Date (Optional)'
+                                    : 'Due: ${Formatters.date(selectedDueDate!)}',
+                              ),
+                            ),
+                          ),
+                          if (selectedDueDate != null) ...[
+                            const SizedBox(width: 8),
+                            IconButton.outlined(
+                              tooltip: 'Clear Due Date',
+                              onPressed: () {
+                                setModalState(() => selectedDueDate = null);
+                              },
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: noteCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Note (Optional)',
+                          prefixIcon: Icon(Icons.notes_rounded),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          if (!formKey.currentState!.validate()) return;
+                          final updated = current.copyWith(
+                            personName: nameCtrl.text.trim(),
+                            type: selectedType,
+                            totalAmount: double.parse(amountCtrl.text.trim()),
+                            dueDate: selectedDueDate,
+                            clearDueDate: selectedDueDate == null,
+                            note: noteCtrl.text.trim(),
+                          );
+                          await DbHelper.instance.updateDebt(updated);
+                          await NotificationService.instance
+                              .syncDebtReminder(updated);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          _loadDetails();
+                        },
+                        child: const Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      amountCtrl.dispose();
+      noteCtrl.dispose();
+    });
   }
 
   Future<void> _confirmDeleteDebt() async {
@@ -229,6 +467,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     );
 
     if (confirmed == true && _debt?.id != null) {
+      await NotificationService.instance.cancelDebtReminders(_debt!.id!);
       await DbHelper.instance.deleteDebt(_debt!.id!);
       if (mounted) Navigator.pop(context);
     }
@@ -258,6 +497,11 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
       appBar: AppBar(
         title: Text(debt.personName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Record',
+            onPressed: _openEditDebtSheet,
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded),
             tooltip: 'Delete Record',

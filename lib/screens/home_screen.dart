@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../data/db_helper.dart';
 import '../models/debt_model.dart';
 import '../utils/formatters.dart';
+import '../utils/notification_service.dart';
 import 'about_screen.dart';
 import 'debt_detail_screen.dart';
 import 'monthly_plan_screen.dart';
@@ -228,7 +229,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             note: noteCtrl.text.trim(),
                             createdAt: DateTime.now(),
                           );
-                          await DbHelper.instance.insertDebt(debt);
+                          final insertedId =
+                              await DbHelper.instance.insertDebt(debt);
+                          await NotificationService.instance.syncDebtReminder(
+                            debt.copyWith(id: insertedId),
+                          );
                           if (ctx.mounted) Navigator.pop(ctx);
                           _loadDebts();
                         },

@@ -1,38 +1,50 @@
 # MYR Debt Tracker
 
-Offline Flutter debt tracker for Malaysian Ringgit (MYR) with Material 3 light/dark themes and local SQLite (`sqflite`) storage.
+**MYR Debt Tracker** is a simple, private, offline-first Flutter app for tracking personal debts in **Malaysian Ringgit (MYR / RM)** — with zero interest calculations, no cloud accounts, and all data stored locally on your device using SQLite (`sqflite`).
+
+Whether you are keeping track of money you owe to friends/family or money owed to you, the app gives you a clear view of your net position, partial payment history, monthly payoff forecasts, and offline due date reminders.
+
+## Features
+
+- **Track Both Sides of Debt**: Record **I Owe** and **Owed to Me** entries with person name, amount in RM (up to RM 100,000.00), optional due date, and notes.
+- **Edit & Manage Records**: Update a debt's details (name, type, total amount, due date, or note) anytime from the detail screen, or delete records cleanly.
+- **Partial & Full Payments**: Log repayments over time with payment history, undo accidental entries, or settle a remaining balance in one tap.
+- **Monthly Plan & Charts**: Visualize upcoming debts you owe across **This Month**, **Next Month**, and **Incoming** months with a donut chart, forecast bar graph, and overdue/undated alerts.
+- **Offline Due Date Reminders**: Automatic local notifications at 9:00 AM (1 day before and/or on the due date), customizable in **Settings** with a built-in test notification.
+- **Light, Dark & System Themes**: Material 3 interface with persistent theme switching in **Settings**.
+- **100% Offline & Private**: All records and preferences stay locally on your Android device in SQLite.
 
 ## Setup & Run (Android)
 
 1. Generate the Android platform scaffolding in this directory (if not already present):
-   ```bash
+   ```powershell
    flutter create . --platforms=android
    ```
 2. Install dependencies:
-   ```bash
+   ```powershell
    flutter pub get
    ```
-3. Run on a connected device or emulator:
-   ```bash
+3. Run on a connected Android device or emulator:
+   ```powershell
    flutter run
    ```
 
 ## Build APK
 
 - **Universal Release APK:**
-  ```bash
+  ```powershell
   flutter build apk --release
   ```
   Output: `build\app\outputs\flutter-apk\app-release.apk`
 
 - **Split APKs by ABI:**
-  ```bash
+  ```powershell
   flutter build apk --split-per-abi
   ```
   Output: `build\app\outputs\flutter-apk\app-arm64-v8a-release.apk`
 
 - **Direct Install via ADB:**
-  ```bash
+  ```powershell
   flutter install
   ```
 

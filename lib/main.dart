@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'utils/notification_service.dart';
 import 'utils/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.instance.load();
+  await NotificationService.instance.init();
   runApp(const MyrDebtTrackerApp());
 }
 

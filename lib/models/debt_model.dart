@@ -37,6 +37,29 @@ class Debt {
     return due.isBefore(today);
   }
 
+  Debt copyWith({
+    int? id,
+    String? personName,
+    DebtType? type,
+    double? totalAmount,
+    double? paidAmount,
+    DateTime? dueDate,
+    bool clearDueDate = false,
+    String? note,
+    DateTime? createdAt,
+  }) {
+    return Debt(
+      id: id ?? this.id,
+      personName: personName ?? this.personName,
+      type: type ?? this.type,
+      totalAmount: totalAmount ?? this.totalAmount,
+      paidAmount: paidAmount ?? this.paidAmount,
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

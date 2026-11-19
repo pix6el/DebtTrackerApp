@@ -94,6 +94,22 @@ class DbHelper {
     return await db.insert('debts', debt.toMap());
   }
 
+  Future<int> updateDebt(Debt debt) async {
+    final db = await database;
+    return await db.update(
+      'debts',
+      {
+        'person_name': debt.personName,
+        'type': debt.type == DebtType.owe ? 'owe' : 'owed',
+        'total_amount': debt.totalAmount,
+        'due_date': debt.dueDate?.toIso8601String(),
+        'note': debt.note,
+      },
+      where: 'id = ?',
+      whereArgs: [debt.id],
+    );
+  }
+
   Future<List<Debt>> getAllDebts() async {
     final db = await database;
     final rows = await db.query('debts', orderBy: 'created_at DESC');
