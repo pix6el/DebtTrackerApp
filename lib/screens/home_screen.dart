@@ -21,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Debt> _debts = [];
   DebtFilter _filter = DebtFilter.all;
+  DebtCategory? _selectedCategory;
   bool _isLoading = true;
   int _selectedTab = 0;
 
@@ -48,20 +49,30 @@ class _HomeScreenState extends State<HomeScreen> {
       .fold(0.0, (sum, d) => sum + d.remainingAmount);
 
   List<Debt> get _filteredDebts {
+    Iterable<Debt> items;
     switch (_filter) {
       case DebtFilter.owe:
-        return _debts
-            .where((d) => d.type == DebtType.owe && !d.isSettled)
-            .toList();
+        items = _debts.where((d) => d.type == DebtType.owe && !d.isSettled);
       case DebtFilter.owed:
-        return _debts
-            .where((d) => d.type == DebtType.owed && !d.isSettled)
-            .toList();
+        items = _debts.where((d) => d.type == DebtType.owed && !d.isSettled);
       case DebtFilter.settled:
-        return _debts.where((d) => d.isSettled).toList();
+        items = _debts.where((d) => d.isSettled);
       case DebtFilter.all:
-        return _debts;
+        items = _debts;
     }
+    if (_selectedCategory != null) {
+      items = items.where((d) => d.category == _selectedCategory);
+    }
+    return items.toList();
+  }
+
+  DateTime _addMonths(DateTime base, int monthsToAdd) {
+    final totalMonths = (base.year * 12 + (base.month - 1)) + monthsToAdd;
+    final targetYear = totalMonths ~/ 12;
+    final targetMonth = (totalMonths % 12) + 1;
+    final lastDayOfMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+    final clampedDay = base.day > lastDayOfMonth ? lastDayOfMonth : base.day;
+    return DateTime(targetYear, targetMonth, clampedDay);
   }
 
   void _openAddDebtSheet() {
@@ -70,7 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     DebtType selectedType = DebtType.owe;
+    DebtCategory selectedCategory = DebtCategory.general;
     DateTime? selectedDueDate;
+    bool isInstallment = false;
+    int installmentMonths = 3;
 
     showModalBottomSheet(
       context: context,
@@ -159,12 +173,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             RegExp(r'^\d*\.?\d{0,2}'),
                           ),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'Total Amount (MYR)',
+                        onChanged: (_) {
+                          if (isInstallment) setModalState(() {});
+                        },
+                        decoration: InputDecoration(
+                          labelText: isInstallment
+                              ? 'Total Debt Amount (MYR)'
+                              : 'Total Amount (MYR)',
                           helperText: 'Max RM 100,000.00',
                           prefixText: 'RM ',
-                          prefixIcon: Icon(Icons.payments_outlined),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.payments_outlined),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -179,6 +198,214 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Category',
+                        style: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: DebtCategory.values.map((cat) {
+                          final selected = selectedCategory == cat;
+                          return ChoiceChip(
+                            avatar: Icon(
+                              cat.icon,
+                              size: 16,
+                              color: selected ? cat.color : null,
+                            ),
+                            label: Text(cat.label),
+                            selected: selected,
+                            onSelected: (_) {
+                              setModalState(() => selectedCategory = cat);
+                            },
+                            showCheckmark: false,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withAlpha(110),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Theme.of(ctx)
+                                .colorScheme
+                                .outlineVariant
+                                .withAlpha(140),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            SwitchListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 2,
+                              ),
+                              secondary: Icon(
+                                Icons.event_repeat_rounded,
+                                color: Theme.of(ctx).colorScheme.primary,
+                              ),
+                              title: const Text(
+                                'Split into Monthly Installments',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                'Auto-schedules across future months in Monthly Plan',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              value: isInstallment,
+                              onChanged: (val) {
+                                setModalState(() {
+                                  isInstallment = val;
+                                  if (val && selectedDueDate == null) {
+                                    final now = DateTime.now();
+                                    selectedDueDate = DateTime(
+                                      now.year,
+                                      now.month,
+                                      now.day,
+                                    );
+                                  }
+                                });
+                              },
+                            ),
+                            if (isInstallment) ...[
+                              const Divider(height: 1),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  10,
+                                  14,
+                                  12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Number of Months',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            IconButton.outlined(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: installmentMonths > 2
+                                                  ? () => setModalState(
+                                                        () =>
+                                                            installmentMonths--,
+                                                      )
+                                                  : null,
+                                              icon: const Icon(
+                                                Icons.remove_rounded,
+                                                size: 16,
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                              ),
+                                              child: Text(
+                                                '$installmentMonths mo',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                            IconButton.outlined(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: installmentMonths < 36
+                                                  ? () => setModalState(
+                                                        () =>
+                                                            installmentMonths++,
+                                                      )
+                                                  : null,
+                                              icon: const Icon(
+                                                Icons.add_rounded,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      children: [2, 3, 6, 12].map((m) {
+                                        return ChoiceChip(
+                                          label: Text('$m mo'),
+                                          selected: installmentMonths == m,
+                                          showCheckmark: false,
+                                          visualDensity: VisualDensity.compact,
+                                          onSelected: (_) {
+                                            setModalState(
+                                              () => installmentMonths = m,
+                                            );
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                    Builder(
+                                      builder: (_) {
+                                        final parsed = double.tryParse(
+                                          amountCtrl.text.trim(),
+                                        );
+                                        final firstDue = selectedDueDate ??
+                                            DateTime.now();
+                                        final lastDue = _addMonths(
+                                          firstDue,
+                                          installmentMonths - 1,
+                                        );
+                                        final perMonth = (parsed != null &&
+                                                parsed > 0)
+                                            ? Formatters.myr(
+                                                parsed / installmentMonths,
+                                              )
+                                            : 'RM 0.00';
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 10,
+                                          ),
+                                          child: Text(
+                                            '$installmentMonths × ~$perMonth/month (${Formatters.monthYear(firstDue)} – ${Formatters.monthYear(lastDue)})',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Theme.of(ctx)
+                                                  .colorScheme
+                                                  .primary,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
@@ -197,8 +424,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.calendar_today_rounded, size: 18),
                         label: Text(
                           selectedDueDate == null
-                              ? 'Add Due Date (Optional)'
-                              : 'Due: ${Formatters.date(selectedDueDate!)}',
+                              ? (isInstallment
+                                  ? 'Pick First Due Date'
+                                  : 'Add Due Date (Optional)')
+                              : (isInstallment
+                                  ? 'First Due: ${Formatters.date(selectedDueDate!)}'
+                                  : 'Due: ${Formatters.date(selectedDueDate!)}'),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -221,25 +452,76 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
-                          final debt = Debt(
-                            personName: nameCtrl.text.trim(),
-                            type: selectedType,
-                            totalAmount: double.parse(amountCtrl.text.trim()),
-                            dueDate: selectedDueDate,
-                            note: noteCtrl.text.trim(),
-                            createdAt: DateTime.now(),
-                          );
-                          final insertedId =
-                              await DbHelper.instance.insertDebt(debt);
-                          await NotificationService.instance.syncDebtReminder(
-                            debt.copyWith(id: insertedId),
-                          );
+                          final totalAmount =
+                              double.parse(amountCtrl.text.trim());
+                          final now = DateTime.now();
+
+                          if (!isInstallment) {
+                            final debt = Debt(
+                              personName: nameCtrl.text.trim(),
+                              type: selectedType,
+                              totalAmount: totalAmount,
+                              dueDate: selectedDueDate,
+                              note: noteCtrl.text.trim(),
+                              createdAt: now,
+                              category: selectedCategory,
+                            );
+                            final insertedId =
+                                await DbHelper.instance.insertDebt(debt);
+                            await NotificationService.instance.syncDebtReminder(
+                              debt.copyWith(id: insertedId),
+                            );
+                          } else {
+                            final firstDue = selectedDueDate ??
+                                DateTime(now.year, now.month, now.day);
+                            final groupId =
+                                now.microsecondsSinceEpoch.toString();
+                            final totalCents = (totalAmount * 100).round();
+                            final baseCents = totalCents ~/ installmentMonths;
+                            final remainderCents =
+                                totalCents - (baseCents * installmentMonths);
+
+                            final installments = <Debt>[];
+                            for (int i = 0; i < installmentMonths; i++) {
+                              final cents = i == installmentMonths - 1
+                                  ? baseCents + remainderCents
+                                  : baseCents;
+                              installments.add(
+                                Debt(
+                                  personName: nameCtrl.text.trim(),
+                                  type: selectedType,
+                                  totalAmount: cents / 100.0,
+                                  dueDate: _addMonths(firstDue, i),
+                                  note: noteCtrl.text.trim(),
+                                  createdAt: now.add(
+                                    Duration(milliseconds: i),
+                                  ),
+                                  category: selectedCategory,
+                                  installmentGroupId: groupId,
+                                  installmentIndex: i + 1,
+                                  installmentTotal: installmentMonths,
+                                ),
+                              );
+                            }
+
+                            final insertedIds = await DbHelper.instance
+                                .insertDebtsBatch(installments);
+                            for (int i = 0; i < installments.length; i++) {
+                              await NotificationService.instance
+                                  .syncDebtReminder(
+                                installments[i].copyWith(id: insertedIds[i]),
+                              );
+                            }
+                          }
+
                           if (ctx.mounted) Navigator.pop(ctx);
                           _loadDebts();
                         },
-                        child: const Text(
-                          'Save Record',
-                          style: TextStyle(
+                        child: Text(
+                          isInstallment
+                              ? 'Save $installmentMonths Installments'
+                              : 'Save Record',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -324,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
-                vertical: 6,
+                vertical: 4,
               ),
               child: Row(
                 children: [
@@ -335,6 +617,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildFilterChip('Owed to Me', DebtFilter.owed),
                   const SizedBox(width: 8),
                   _buildFilterChip('Settled', DebtFilter.settled),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+              child: Row(
+                children: [
+                  _buildCategoryChip(null, 'All Tags', Icons.sell_outlined),
+                  for (final cat in DebtCategory.values) ...[
+                    const SizedBox(width: 8),
+                    _buildCategoryChip(cat, cat.label, cat.icon),
+                  ],
                 ],
               ),
             ),
@@ -517,6 +814,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCategoryChip(DebtCategory? value, String label, IconData icon) {
+    final isSelected = _selectedCategory == value;
+    final catColor = value?.color ?? Theme.of(context).colorScheme.primary;
+    return FilterChip(
+      avatar: Icon(
+        icon,
+        size: 15,
+        color: isSelected
+            ? catColor
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedCategory = value),
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+
   Widget _buildDebtCard(Debt debt) {
     final isOwe = debt.type == DebtType.owe;
     final accentColor = debt.isSettled
@@ -566,16 +885,89 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          debt.personName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
                         Row(
                           children: [
+                            Flexible(
+                              child: Text(
+                                debt.personName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            if (debt.isInstallment) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primaryContainer
+                                      .withAlpha(180),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.event_repeat_rounded,
+                                      size: 11,
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      debt.installmentLabel,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: debt.category.color.withAlpha(26),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    debt.category.icon,
+                                    size: 11,
+                                    color: debt.category.color,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    debt.category.label,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: debt.category.color,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             Text(
                               isOwe ? 'You owe' : 'Owes you',
                               style: TextStyle(
@@ -583,18 +975,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            if (debt.dueDate != null) ...[
-                              Text(
-                                ' • ',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
+                            if (debt.dueDate != null)
                               Text(
                                 debt.isOverdue
-                                    ? 'Overdue (${Formatters.date(debt.dueDate!)})'
-                                    : 'Due ${Formatters.date(debt.dueDate!)}',
+                                    ? '• Overdue (${Formatters.date(debt.dueDate!)})'
+                                    : '• Due ${Formatters.date(debt.dueDate!)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: debt.isOverdue
@@ -605,7 +990,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       : colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                            ],
                           ],
                         ),
                       ],

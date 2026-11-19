@@ -7,7 +7,9 @@ Whether you are keeping track of money you owe to friends/family or money owed t
 ## Features
 
 - **Track Both Sides of Debt**: Record **I Owe** and **Owed to Me** entries with person name, amount in RM (up to RM 100,000.00), optional due date, and notes.
-- **Edit & Manage Records**: Update a debt's details (name, type, total amount, due date, or note) anytime from the detail screen, or delete records cleanly.
+- **Monthly Installment Plans**: Split a larger debt into 2–36 monthly installments that automatically populate future months in the **Monthly Plan** with accurate cent rounding and individual due-date reminders.
+- **Categories / Tags**: Label debts (*General*, *Family*, *Friends*, *Bills*, *Business*, *Other*) to filter your debt list and view a **By Category** spending breakdown in **Monthly Plan**.
+- **Edit & Manage Records**: Update a debt's details (name, type, category, total amount, due date, or note) anytime from the detail screen, or delete individual records / entire installment plans cleanly.
 - **Partial & Full Payments**: Log repayments over time with payment history, undo accidental entries, or settle a remaining balance in one tap.
 - **Monthly Plan & Charts**: Visualize upcoming debts you owe across **This Month**, **Next Month**, and **Incoming** months with a donut chart, forecast bar graph, and overdue/undated alerts.
 - **Offline Due Date Reminders**: Automatic local notifications at 9:00 AM (1 day before and/or on the due date), customizable in **Settings** with a built-in test notification.
@@ -47,6 +49,3 @@ Whether you are keeping track of money you owe to friends/family or money owed t
   ```powershell
   flutter install
   ```
-
-### Optional: Change App Launcher Name
-In `android/app/src/main/AndroidManifest.xml`, update `android:label="Debt Tracker"`.

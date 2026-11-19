@@ -228,6 +228,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     );
     final noteCtrl = TextEditingController(text: current.note);
     DebtType selectedType = current.type;
+    DebtCategory selectedCategory = current.category;
     DateTime? selectedDueDate = current.dueDate;
 
     showModalBottomSheet(
@@ -344,6 +345,34 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                         },
                       ),
                       const SizedBox(height: 14),
+                      Text(
+                        'Category',
+                        style: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: DebtCategory.values.map((cat) {
+                          final selected = selectedCategory == cat;
+                          return ChoiceChip(
+                            avatar: Icon(
+                              cat.icon,
+                              size: 16,
+                              color: selected ? cat.color : null,
+                            ),
+                            label: Text(cat.label),
+                            selected: selected,
+                            onSelected: (_) {
+                              setModalState(() => selectedCategory = cat);
+                            },
+                            showCheckmark: false,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
@@ -414,6 +443,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                             dueDate: selectedDueDate,
                             clearDueDate: selectedDueDate == null,
                             note: noteCtrl.text.trim(),
+                            category: selectedCategory,
                           );
                           await DbHelper.instance.updateDebt(updated);
                           await NotificationService.instance
@@ -445,30 +475,78 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
   }
 
   Future<void> _confirmDeleteDebt() async {
-    final confirmed = await showDialog<bool>(
+    final debt = _debt;
+    if (debt == null || debt.id == null) return;
+
+    if (!debt.isInstallment) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete Record?'),
+          content: const Text(
+            'This will permanently delete this debt and all its payment history.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await NotificationService.instance.cancelDebtReminders(debt.id!);
+        await DbHelper.instance.deleteDebt(debt.id!);
+        if (mounted) Navigator.pop(context);
+      }
+      return;
+    }
+
+    final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Record?'),
-        content: const Text(
-          'This will permanently delete this debt and all its payment history.',
+        title: const Text('Delete Installment?'),
+        content: Text(
+          'This is installment ${debt.installmentIndex} of ${debt.installmentTotal}. Delete only this month or the entire installment plan?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, 'single'),
+            child: const Text('This Only'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(ctx, 'all'),
+            child: Text('All ${debt.installmentTotal}'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true && _debt?.id != null) {
-      await NotificationService.instance.cancelDebtReminders(_debt!.id!);
-      await DbHelper.instance.deleteDebt(_debt!.id!);
+    if (choice == 'single') {
+      await NotificationService.instance.cancelDebtReminders(debt.id!);
+      await DbHelper.instance.deleteDebt(debt.id!);
+      if (mounted) Navigator.pop(context);
+    } else if (choice == 'all' && debt.installmentGroupId != null) {
+      final groupItems = await DbHelper.instance.getDebtsByInstallmentGroup(
+        debt.installmentGroupId!,
+      );
+      for (final item in groupItems) {
+        if (item.id != null) {
+          await NotificationService.instance.cancelDebtReminders(item.id!);
+        }
+      }
+      await DbHelper.instance.deleteInstallmentGroup(debt.installmentGroupId!);
       if (mounted) Navigator.pop(context);
     }
   }
@@ -529,27 +607,97 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: accentColor.withAlpha(30),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            debt.isSettled
-                                ? 'Settled'
-                                : (isOwe ? 'You Owe' : 'Owed to Me'),
-                            style: TextStyle(
-                              color: accentColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  debt.isSettled
+                                      ? 'Settled'
+                                      : (isOwe ? 'You Owe' : 'Owed to Me'),
+                                  style: TextStyle(
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: debt.category.color.withAlpha(28),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      debt.category.icon,
+                                      size: 13,
+                                      color: debt.category.color,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      debt.category.label,
+                                      style: TextStyle(
+                                        color: debt.category.color,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (debt.isInstallment)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withAlpha(180),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.event_repeat_rounded,
+                                        size: 13,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Installment ${debt.installmentLabel}',
+                                        style: TextStyle(
+                                          color: colorScheme.onPrimaryContainer,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '$progressPercent% paid',
                           style: TextStyle(

@@ -20,7 +20,7 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -34,7 +34,11 @@ class DbHelper {
             paid_amount REAL NOT NULL DEFAULT 0.0,
             due_date TEXT,
             note TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'general',
+            installment_group_id TEXT,
+            installment_index INTEGER,
+            installment_total INTEGER
           )
         ''');
 
@@ -54,6 +58,20 @@ class DbHelper {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createSettingsTable(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            "ALTER TABLE debts ADD COLUMN category TEXT NOT NULL DEFAULT 'general'",
+          );
+          await db.execute(
+            'ALTER TABLE debts ADD COLUMN installment_group_id TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE debts ADD COLUMN installment_index INTEGER',
+          );
+          await db.execute(
+            'ALTER TABLE debts ADD COLUMN installment_total INTEGER',
+          );
         }
       },
     );
@@ -94,6 +112,18 @@ class DbHelper {
     return await db.insert('debts', debt.toMap());
   }
 
+  Future<List<int>> insertDebtsBatch(List<Debt> debts) async {
+    final db = await database;
+    final ids = <int>[];
+    await db.transaction((txn) async {
+      for (final debt in debts) {
+        final id = await txn.insert('debts', debt.toMap());
+        ids.add(id);
+      }
+    });
+    return ids;
+  }
+
   Future<int> updateDebt(Debt debt) async {
     final db = await database;
     return await db.update(
@@ -104,9 +134,30 @@ class DbHelper {
         'total_amount': debt.totalAmount,
         'due_date': debt.dueDate?.toIso8601String(),
         'note': debt.note,
+        'category': debt.category.key,
       },
       where: 'id = ?',
       whereArgs: [debt.id],
+    );
+  }
+
+  Future<List<Debt>> getDebtsByInstallmentGroup(String groupId) async {
+    final db = await database;
+    final rows = await db.query(
+      'debts',
+      where: 'installment_group_id = ?',
+      whereArgs: [groupId],
+      orderBy: 'installment_index ASC',
+    );
+    return rows.map((row) => Debt.fromMap(row)).toList();
+  }
+
+  Future<int> deleteInstallmentGroup(String groupId) async {
+    final db = await database;
+    return await db.delete(
+      'debts',
+      where: 'installment_group_id = ?',
+      whereArgs: [groupId],
     );
   }
 

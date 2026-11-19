@@ -304,6 +304,12 @@ class _MonthlyPlanScreenState extends State<MonthlyPlanScreen> {
           // Monthly Forecast Bar Graph Card
           _buildForecastCard(context, forecastBuckets),
 
+          // Category Breakdown Card (shows where unpaid 'I Owe' money is going)
+          if (_unpaidOweDebts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildCategoryBreakdownCard(context),
+          ],
+
           // Overdue & Undated notice cards (so nothing is missed)
           if (overduePastDebts.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -369,25 +375,53 @@ class _MonthlyPlanScreenState extends State<MonthlyPlanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          debt.personName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (debt.isInstallment) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withAlpha(180),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            debt.installmentLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   Text(
-                    debt.personName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    debt.dueDate != null
+                        ? '${debt.category.label} • ${debt.isOverdue ? 'Overdue (${Formatters.date(debt.dueDate!)})' : 'Due ${Formatters.date(debt.dueDate!)}'}'
+                        : debt.category.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: debt.isOverdue
+                          ? const Color(0xFFD94848)
+                          : colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (debt.dueDate != null)
-                    Text(
-                      debt.isOverdue
-                          ? 'Overdue • ${Formatters.date(debt.dueDate!)}'
-                          : 'Due ${Formatters.date(debt.dueDate!)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: debt.isOverdue
-                            ? const Color(0xFFD94848)
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -532,6 +566,115 @@ class _MonthlyPlanScreenState extends State<MonthlyPlanScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryBreakdownCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final totalsByCategory = <DebtCategory, double>{};
+    final countsByCategory = <DebtCategory, int>{};
+
+    for (final debt in _unpaidOweDebts) {
+      totalsByCategory[debt.category] =
+          (totalsByCategory[debt.category] ?? 0.0) + debt.remainingAmount;
+      countsByCategory[debt.category] =
+          (countsByCategory[debt.category] ?? 0) + 1;
+    }
+
+    final sortedCategories = totalsByCategory.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final grandTotal = _sumRemaining(_unpaidOweDebts);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withAlpha(140),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'By Category',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Where your unpaid debts are going',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            for (final entry in sortedCategories)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              entry.key.icon,
+                              size: 16,
+                              color: entry.key.color,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              entry.key.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '(${countsByCategory[entry.key]})',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          Formatters.myr(entry.value),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: grandTotal > 0 ? entry.value / grandTotal : 0,
+                        minHeight: 7,
+                        backgroundColor: entry.key.color.withAlpha(30),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          entry.key.color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ],

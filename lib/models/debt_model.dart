@@ -1,4 +1,85 @@
+import 'package:flutter/material.dart';
+
 enum DebtType { owe, owed }
+
+enum DebtCategory { general, family, friends, bills, business, other }
+
+extension DebtCategoryX on DebtCategory {
+  String get key {
+    switch (this) {
+      case DebtCategory.general:
+        return 'general';
+      case DebtCategory.family:
+        return 'family';
+      case DebtCategory.friends:
+        return 'friends';
+      case DebtCategory.bills:
+        return 'bills';
+      case DebtCategory.business:
+        return 'business';
+      case DebtCategory.other:
+        return 'other';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case DebtCategory.general:
+        return 'General';
+      case DebtCategory.family:
+        return 'Family';
+      case DebtCategory.friends:
+        return 'Friends';
+      case DebtCategory.bills:
+        return 'Bills';
+      case DebtCategory.business:
+        return 'Business';
+      case DebtCategory.other:
+        return 'Other';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case DebtCategory.general:
+        return Icons.label_outline_rounded;
+      case DebtCategory.family:
+        return Icons.family_restroom_rounded;
+      case DebtCategory.friends:
+        return Icons.people_outline_rounded;
+      case DebtCategory.bills:
+        return Icons.receipt_long_outlined;
+      case DebtCategory.business:
+        return Icons.business_center_outlined;
+      case DebtCategory.other:
+        return Icons.category_outlined;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case DebtCategory.general:
+        return const Color(0xFF0F766E);
+      case DebtCategory.family:
+        return const Color(0xFF2563EB);
+      case DebtCategory.friends:
+        return const Color(0xFF7C3AED);
+      case DebtCategory.bills:
+        return const Color(0xFFD97706);
+      case DebtCategory.business:
+        return const Color(0xFF0891B2);
+      case DebtCategory.other:
+        return const Color(0xFF64748B);
+    }
+  }
+
+  static DebtCategory fromKey(String? raw) {
+    for (final cat in DebtCategory.values) {
+      if (cat.key == raw) return cat;
+    }
+    return DebtCategory.general;
+  }
+}
 
 class Debt {
   final int? id;
@@ -9,6 +90,10 @@ class Debt {
   final DateTime? dueDate;
   final String note;
   final DateTime createdAt;
+  final DebtCategory category;
+  final String? installmentGroupId;
+  final int? installmentIndex;
+  final int? installmentTotal;
 
   Debt({
     this.id,
@@ -19,12 +104,25 @@ class Debt {
     this.dueDate,
     this.note = '',
     required this.createdAt,
+    this.category = DebtCategory.general,
+    this.installmentGroupId,
+    this.installmentIndex,
+    this.installmentTotal,
   });
 
   double get remainingAmount =>
       (totalAmount - paidAmount).clamp(0.0, totalAmount);
 
   bool get isSettled => remainingAmount <= 0.009;
+
+  bool get isInstallment =>
+      installmentGroupId != null &&
+      installmentIndex != null &&
+      installmentTotal != null &&
+      installmentTotal! > 1;
+
+  String get installmentLabel =>
+      isInstallment ? '$installmentIndex/$installmentTotal' : '';
 
   double get progress =>
       totalAmount == 0 ? 1.0 : (paidAmount / totalAmount).clamp(0.0, 1.0);
@@ -47,6 +145,10 @@ class Debt {
     bool clearDueDate = false,
     String? note,
     DateTime? createdAt,
+    DebtCategory? category,
+    String? installmentGroupId,
+    int? installmentIndex,
+    int? installmentTotal,
   }) {
     return Debt(
       id: id ?? this.id,
@@ -57,6 +159,10 @@ class Debt {
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
+      category: category ?? this.category,
+      installmentGroupId: installmentGroupId ?? this.installmentGroupId,
+      installmentIndex: installmentIndex ?? this.installmentIndex,
+      installmentTotal: installmentTotal ?? this.installmentTotal,
     );
   }
 
@@ -70,6 +176,10 @@ class Debt {
       'due_date': dueDate?.toIso8601String(),
       'note': note,
       'created_at': createdAt.toIso8601String(),
+      'category': category.key,
+      'installment_group_id': installmentGroupId,
+      'installment_index': installmentIndex,
+      'installment_total': installmentTotal,
     };
   }
 
@@ -85,6 +195,10 @@ class Debt {
           : null,
       note: (map['note'] as String?) ?? '',
       createdAt: DateTime.parse(map['created_at'] as String),
+      category: DebtCategoryX.fromKey(map['category'] as String?),
+      installmentGroupId: map['installment_group_id'] as String?,
+      installmentIndex: map['installment_index'] as int?,
+      installmentTotal: map['installment_total'] as int?,
     );
   }
 }

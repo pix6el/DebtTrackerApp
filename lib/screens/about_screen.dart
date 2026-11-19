@@ -61,17 +61,17 @@ class _InstructionsTab extends StatelessWidget {
         const _StepCard(
           stepNumber: '1',
           icon: Icons.add_circle_outline_rounded,
-          title: 'Add a Debt Record',
+          title: 'Add Single or Installment Debts',
           description:
-              'Tap the "+ Add Debt" button on the home screen. Choose whether "I Owe" someone or money is "Owed to Me", then enter the person\'s name, amount in RM (up to RM 100,000.00), an optional due date, and a note.',
+              'Tap "+ Add Debt", choose "I Owe" or "Owed to Me", pick a category tag (Family, Friends, Bills, Business, etc.), and enter the amount in RM. Toggle "Split into Monthly Installments" to divide a larger debt across 2–36 monthly due dates automatically.',
         ),
         const SizedBox(height: 12),
         const _StepCard(
           stepNumber: '2',
           icon: Icons.filter_list_rounded,
-          title: 'Track Balances & Filter',
+          title: 'Track Balances & Filter by Tag',
           description:
-              'The summary card at the top shows your live Net Position, total You Owe, and total Owed to Me. Use the filter chips (All, I Owe, Owed to Me, Settled) to quickly find specific records.',
+              'The summary card at the top shows your live Net Position, total You Owe, and total Owed to Me. Combine the status chips (All, I Owe, Owed to Me, Settled) with the category tag row to quickly see where your money is going.',
         ),
         const SizedBox(height: 12),
         const _StepCard(
