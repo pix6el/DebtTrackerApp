@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../utils/backup_service.dart';
+import '../utils/formatters.dart';
 import '../utils/notification_service.dart';
 import '../utils/theme_controller.dart';
 import 'about_screen.dart';
@@ -198,6 +201,91 @@ class SettingsScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
                 child: Text(
+                  'BACKUP & RESTORE',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+              ),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: colorScheme.outlineVariant.withAlpha(140),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: _iconBox(
+                        colorScheme,
+                        Icons.upload_file_rounded,
+                      ),
+                      title: const Text(
+                        'Export Backup (.json)',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'Save all debts, payments, and settings to a file',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _exportBackup(context),
+                    ),
+                    const Divider(height: 1, indent: 68),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: _iconBox(
+                        colorScheme,
+                        Icons.download_for_offline_outlined,
+                      ),
+                      title: const Text(
+                        'Import Backup (.json)',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'Restore records from a previously exported file',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _importBackup(context),
+                    ),
+                    const Divider(height: 1, indent: 68),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: _iconBox(
+                        colorScheme,
+                        Icons.copy_all_rounded,
+                      ),
+                      title: const Text(
+                        'Copy Backup JSON',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'Copy raw backup text to your clipboard',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _copyBackupJson(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+                child: Text(
                   'APP INFORMATION',
                   style: textTheme.labelSmall?.copyWith(
                     color: colorScheme.primary,
@@ -262,7 +350,7 @@ class SettingsScreen extends StatelessWidget {
                         'About & Guide',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Instructions and app version 1.0.0'),
+                      subtitle: const Text('Instructions and app version 1.1.0'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () {
                         Navigator.push(
@@ -293,6 +381,116 @@ class SettingsScreen extends StatelessWidget {
       ),
       child: Icon(icon, color: colorScheme.primary, size: 22),
     );
+  }
+
+  void _showSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? colorScheme.error : null,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _exportBackup(BuildContext context) async {
+    try {
+      final saved = await BackupService.instance.exportToFile();
+      if (!context.mounted) return;
+      if (saved) {
+        _showSnackBar(context, 'Backup exported successfully');
+      }
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        _showSnackBar(
+          context,
+          e.message ?? 'Could not export backup file',
+          isError: true,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showSnackBar(context, 'Failed to export backup', isError: true);
+      }
+    }
+  }
+
+  Future<void> _importBackup(BuildContext context) async {
+    try {
+      final preview = await BackupService.instance.pickBackupFile();
+      if (!context.mounted || preview == null) return;
+
+      final exportedLabel = preview.exportedAt != null
+          ? Formatters.dateTime(preview.exportedAt!.toLocal())
+          : 'Unknown date';
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Restore Backup?'),
+          content: Text(
+            'Exported: $exportedLabel\n'
+            'Debts: ${preview.debtCount}\n'
+            'Payments: ${preview.paymentCount}\n\n'
+            'Importing this backup will replace all current records and settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Restore'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+
+      final result = await BackupService.instance.restoreBackup(preview);
+      if (!context.mounted) return;
+      _showSnackBar(
+        context,
+        'Restored ${result.debtCount} debts and ${result.paymentCount} payments',
+      );
+    } on FormatException catch (e) {
+      if (context.mounted) {
+        _showSnackBar(context, e.message, isError: true);
+      }
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        _showSnackBar(
+          context,
+          e.message ?? 'Could not read backup file',
+          isError: true,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showSnackBar(context, 'Failed to restore backup', isError: true);
+      }
+    }
+  }
+
+  Future<void> _copyBackupJson(BuildContext context) async {
+    try {
+      final jsonText = await BackupService.instance.createBackupJson();
+      await Clipboard.setData(ClipboardData(text: jsonText));
+      if (context.mounted) {
+        _showSnackBar(context, 'Backup JSON copied to clipboard');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showSnackBar(context, 'Failed to copy backup JSON', isError: true);
+      }
+    }
   }
 }
 

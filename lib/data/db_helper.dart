@@ -211,4 +211,97 @@ class DbHelper {
       );
     });
   }
+
+  Future<Map<String, dynamic>> exportBackupData() async {
+    final db = await database;
+    final debts = await db.query('debts', orderBy: 'id ASC');
+    final payments = await db.query('payments', orderBy: 'id ASC');
+    final settingsRows = await db.query('app_settings', orderBy: 'key ASC');
+
+    final settingsMap = <String, String>{};
+    for (final row in settingsRows) {
+      final key = row['key'];
+      final value = row['value'];
+      if (key is String && value is String) {
+        settingsMap[key] = value;
+      }
+    }
+
+    return {
+      'app': 'myr_debt_tracker',
+      'schema_version': 3,
+      'app_version': '1.1.0',
+      'exported_at': DateTime.now().toIso8601String(),
+      'debts': debts,
+      'payments': payments,
+      'settings': settingsMap,
+    };
+  }
+
+  Future<({int debtCount, int paymentCount})> importBackupData(
+    Map<String, dynamic> data,
+  ) async {
+    final rawDebts = data['debts'];
+    final rawPayments = data['payments'];
+    if (rawDebts is! List || rawPayments is! List) {
+      throw const FormatException('Backup is missing debts or payments list.');
+    }
+
+    final parsedDebts = <({int? oldId, Debt debt})>[];
+    for (final item in rawDebts) {
+      final map = Map<String, dynamic>.from(item as Map);
+      final debt = Debt.fromMap(map);
+      parsedDebts.add((oldId: debt.id, debt: debt));
+    }
+
+    final parsedPayments = <DebtPayment>[];
+    for (final item in rawPayments) {
+      final map = Map<String, dynamic>.from(item as Map);
+      parsedPayments.add(DebtPayment.fromMap(map));
+    }
+
+    final db = await database;
+    var restoredPayments = 0;
+
+    await db.transaction((txn) async {
+      await txn.delete('payments');
+      await txn.delete('debts');
+
+      final idMap = <int, int>{};
+      for (final entry in parsedDebts) {
+        final debtMap = entry.debt.toMap()..remove('id');
+        final newId = await txn.insert('debts', debtMap);
+        if (entry.oldId != null) {
+          idMap[entry.oldId!] = newId;
+        }
+      }
+
+      for (final payment in parsedPayments) {
+        final mappedDebtId = idMap[payment.debtId];
+        if (mappedDebtId == null) continue;
+        final paymentMap = payment.toMap()
+          ..remove('id')
+          ..['debt_id'] = mappedDebtId;
+        await txn.insert('payments', paymentMap);
+        restoredPayments++;
+      }
+
+      final rawSettings = data['settings'];
+      if (rawSettings is Map) {
+        for (final entry in rawSettings.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (key is String && value is String) {
+            await txn.insert(
+              'app_settings',
+              {'key': key, 'value': value},
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        }
+      }
+    });
+
+    return (debtCount: parsedDebts.length, paymentCount: restoredPayments);
+  }
 }

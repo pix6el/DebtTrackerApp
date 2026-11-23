@@ -1130,14 +1130,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openSettingsScreen() {
+  Future<void> _openSettingsScreen() async {
     Navigator.pop(context);
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => const SettingsScreen(),
       ),
     );
+    _loadDebts();
   }
 
   Widget _buildSidebar(ColorScheme colorScheme) {
@@ -1276,7 +1277,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Version 1.0.0 • 100% Offline',
+                    'Version 1.1.0 • 100% Offline',
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.outline,
                     ),

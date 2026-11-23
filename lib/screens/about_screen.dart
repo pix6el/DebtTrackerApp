@@ -206,7 +206,7 @@ class _AboutTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Version 1.0.0',
+                  'Version 1.1.0',
                   style: textTheme.labelMedium?.copyWith(
                     color: colorScheme.onPrimary,
                     fontWeight: FontWeight.w600,

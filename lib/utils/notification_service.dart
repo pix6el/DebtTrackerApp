@@ -57,6 +57,21 @@ class NotificationService {
     }
   }
 
+  Future<void> reloadFromSettings() async {
+    final savedEnabled = await DbHelper.instance.getSetting(_enabledKey);
+    enabled.value = savedEnabled != 'false';
+
+    final savedTiming = await DbHelper.instance.getSetting(_timingKey);
+    timing.value = _timingFromString(savedTiming);
+
+    if (!_initialized) return;
+    if (enabled.value) {
+      await rescheduleAllDebts();
+    } else {
+      await cancelAll();
+    }
+  }
+
   Future<bool> requestPermission() async {
     if (!_initialized) return false;
     try {
