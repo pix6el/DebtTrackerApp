@@ -7,6 +7,7 @@ import '../utils/notification_service.dart';
 import 'about_screen.dart';
 import 'debt_detail_screen.dart';
 import 'monthly_plan_screen.dart';
+import 'people_summary_screen.dart';
 import 'settings_screen.dart';
 
 enum DebtFilter { all, owe, owed, settled }
@@ -721,19 +722,28 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: _buildSidebar(colorScheme),
       appBar: AppBar(
         title: Text(
-          _selectedTab == 0 ? 'Debt Tracker' : 'Monthly Plan',
+          switch (_selectedTab) {
+            0 => 'Debt Tracker',
+            1 => 'People Summary',
+            _ => 'Monthly Plan',
+          },
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: false,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _selectedTab == 0
-              ? _buildDebtsBody(colorScheme, netBalance)
-              : MonthlyPlanScreen(
+          : switch (_selectedTab) {
+              0 => _buildDebtsBody(colorScheme, netBalance),
+              1 => PeopleSummaryScreen(
                   debts: _debts,
                   onRefresh: _loadDebts,
                 ),
+              _ => MonthlyPlanScreen(
+                  debts: _debts,
+                  onRefresh: _loadDebts,
+                ),
+            },
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (index) {
@@ -744,6 +754,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.account_balance_wallet_outlined),
             selectedIcon: Icon(Icons.account_balance_wallet_rounded),
             label: 'Debts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline_rounded),
+            selectedIcon: Icon(Icons.people_rounded),
+            label: 'People',
           ),
           NavigationDestination(
             icon: Icon(Icons.donut_large_outlined),
@@ -1489,13 +1504,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   _buildDrawerTile(
-                    icon: Icons.donut_large_outlined,
-                    selectedIcon: Icons.donut_large_rounded,
-                    label: 'Monthly Plan',
+                    icon: Icons.people_outline_rounded,
+                    selectedIcon: Icons.people_rounded,
+                    label: 'People Summary',
                     selected: _selectedTab == 1,
                     onTap: () {
                       Navigator.pop(context);
                       setState(() => _selectedTab = 1);
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerTile(
+                    icon: Icons.donut_large_outlined,
+                    selectedIcon: Icons.donut_large_rounded,
+                    label: 'Monthly Plan',
+                    selected: _selectedTab == 2,
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() => _selectedTab = 2);
                     },
                   ),
                   const Padding(
