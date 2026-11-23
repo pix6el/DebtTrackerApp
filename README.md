@@ -2,12 +2,20 @@
 
 **MYR Debt Tracker** is a simple, private, offline-first Flutter app for tracking personal debts in **Malaysian Ringgit (MYR / RM)** — with zero interest calculations, no cloud accounts, and all data stored locally on your device using SQLite (`sqflite`).
 
-Whether you are keeping track of money you owe to friends/family or money owed to you, the app gives you a clear view of your net position, partial payment history, monthly payoff forecasts, and offline due date reminders.
+Whether you are keeping track of money you owe to friends/family or money owed to you, the app gives you a clear view of your net position, partial payment history, monthly payoff forecasts, person-by-person totals, and offline due date reminders.
+
+## Download (Android APK)
+
+Get the latest prebuilt APK from the [GitHub Releases](https://github.com/pix6el/ManageDebtApp/releases/latest) page:
+
+1. Download the `.apk` file (e.g. `myr-debt-tracker-v1.0.apk`) on your Android phone.
+2. Open the downloaded file and allow **Install from unknown sources** if prompted.
+3. Tap **Install**. *(Future APK updates can be installed directly over an existing version — your local SQLite records, payments, and settings will be preserved.)*
 
 ## Features
 
 - **Track Both Sides of Debt**: Record **I Owe** and **Owed to Me** entries with person name, amount in RM (up to RM 100,000.00), optional due date, and notes.
-- **Repeat & Split Monthly Installments**: Repeat a monthly amount (e.g., RM 200 for 6 months) or split a total across 2–36 months so installments automatically populate future months in the **Monthly Plan** with individual reminders.
+- **Repeat & Split Monthly Installments**: Repeat a monthly amount (e.g. RM 200 for 6 months) or split a total across 2–36 months so installments automatically populate future months in the **Monthly Plan** with individual reminders.
 - **Categories / Tags**: Label debts (*General*, *Family*, *Friends*, *Bills*, *Business*, *Other*) to filter your debt list and view a **By Category** spending breakdown in **Monthly Plan**.
 - **Search & Sort**: Search debts instantly by person name, note, or tag, and sort by **Soonest Due**, **Highest Balance**, **Newest**, or **Name (A–Z)**.
 - **Group by Person Summary**: View combined net totals and expandable debt lists per person in the dedicated **People** tab.
@@ -18,6 +26,13 @@ Whether you are keeping track of money you owe to friends/family or money owed t
 - **JSON Backup & Restore**: Export all debts, payment history, and preferences to a `.json` file (or copy to clipboard) and restore anytime from **Settings**.
 - **Light, Dark & System Themes**: Material 3 interface with persistent theme switching in **Settings**.
 - **100% Offline & Private**: All records and preferences stay locally on your Android device in SQLite.
+
+## Tech Stack
+
+- **Flutter & Material 3** (Dart `>=3.5.0`)
+- **`sqflite` + `path`** for local SQLite storage and automatic schema migrations
+- **`flutter_local_notifications` + `timezone`** for offline scheduled reminders
+- **Android Storage Access Framework (`MethodChannel`)** for portable `.json` backup export/import
 
 ## Setup & Run (Android)
 
@@ -34,13 +49,20 @@ Whether you are keeping track of money you owe to friends/family or money owed t
    flutter run
    ```
 
-## Build APK
+## Build APK (Android)
 
 - **Universal Release APK:**
   ```powershell
+  flutter clean
+  flutter pub get
   flutter build apk --release
   ```
   Output: `build\app\outputs\flutter-apk\app-release.apk`
+
+- **Rename / Copy for a GitHub Release:**
+  ```powershell
+  Copy-Item build\app\outputs\flutter-apk\app-release.apk build\app\outputs\flutter-apk\myr-debt-tracker-v1.0.apk
+  ```
 
 - **Split APKs by ABI:**
   ```powershell
