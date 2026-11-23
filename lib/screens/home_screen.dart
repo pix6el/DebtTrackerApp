@@ -11,6 +11,36 @@ import 'settings_screen.dart';
 
 enum DebtFilter { all, owe, owed, settled }
 
+enum DebtSort { newest, soonestDue, highestBalance, nameAZ }
+
+extension DebtSortX on DebtSort {
+  String get label {
+    switch (this) {
+      case DebtSort.newest:
+        return 'Newest';
+      case DebtSort.soonestDue:
+        return 'Soonest Due';
+      case DebtSort.highestBalance:
+        return 'Highest Balance';
+      case DebtSort.nameAZ:
+        return 'Name (A–Z)';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case DebtSort.newest:
+        return Icons.schedule_rounded;
+      case DebtSort.soonestDue:
+        return Icons.event_available_rounded;
+      case DebtSort.highestBalance:
+        return Icons.trending_up_rounded;
+      case DebtSort.nameAZ:
+        return Icons.sort_by_alpha_rounded;
+    }
+  }
+}
+
 enum MonthlyScheduleMode { repeatEachMonth, splitTotal }
 
 class HomeScreen extends StatefulWidget {
@@ -21,9 +51,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
   List<Debt> _debts = [];
   DebtFilter _filter = DebtFilter.all;
   DebtCategory? _selectedCategory;
+  String _searchQuery = '';
+  DebtSort _sort = DebtSort.newest;
   bool _isLoading = true;
   int _selectedTab = 0;
 
@@ -31,6 +64,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadDebts();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDebts() async {
@@ -50,6 +89,28 @@ class _HomeScreenState extends State<HomeScreen> {
       .where((d) => d.type == DebtType.owed && !d.isSettled)
       .fold(0.0, (sum, d) => sum + d.remainingAmount);
 
+  bool get _hasActiveFilters =>
+      _filter != DebtFilter.all ||
+      _selectedCategory != null ||
+      _searchQuery.trim().isNotEmpty ||
+      _sort != DebtSort.newest;
+
+  void _resetFilters() {
+    _searchCtrl.clear();
+    setState(() {
+      _searchQuery = '';
+      _filter = DebtFilter.all;
+      _selectedCategory = null;
+      _sort = DebtSort.newest;
+    });
+  }
+
+  int _dueRank(Debt d) {
+    if (d.isSettled) return 2;
+    if (d.dueDate != null) return 0;
+    return 1;
+  }
+
   List<Debt> get _filteredDebts {
     Iterable<Debt> items;
     switch (_filter) {
@@ -65,7 +126,46 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedCategory != null) {
       items = items.where((d) => d.category == _selectedCategory);
     }
-    return items.toList();
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      items = items.where(
+        (d) =>
+            d.personName.toLowerCase().contains(query) ||
+            d.note.toLowerCase().contains(query) ||
+            d.category.label.toLowerCase().contains(query),
+      );
+    }
+
+    final result = items.toList();
+    result.sort((a, b) {
+      switch (_sort) {
+        case DebtSort.newest:
+          return b.createdAt.compareTo(a.createdAt);
+        case DebtSort.soonestDue:
+          final rankCmp = _dueRank(a).compareTo(_dueRank(b));
+          if (rankCmp != 0) return rankCmp;
+          if (a.dueDate != null && b.dueDate != null && !a.isSettled) {
+            final dueCmp = a.dueDate!.compareTo(b.dueDate!);
+            if (dueCmp != 0) return dueCmp;
+            final remCmp = b.remainingAmount.compareTo(a.remainingAmount);
+            if (remCmp != 0) return remCmp;
+          }
+          return b.createdAt.compareTo(a.createdAt);
+        case DebtSort.highestBalance:
+          final remCmp = b.remainingAmount.compareTo(a.remainingAmount);
+          if (remCmp != 0) return remCmp;
+          final totalCmp = b.totalAmount.compareTo(a.totalAmount);
+          if (totalCmp != 0) return totalCmp;
+          return b.createdAt.compareTo(a.createdAt);
+        case DebtSort.nameAZ:
+          final nameCmp = a.personName.toLowerCase().compareTo(
+                b.personName.toLowerCase(),
+              );
+          if (nameCmp != 0) return nameCmp;
+          return b.createdAt.compareTo(a.createdAt);
+      }
+    });
+    return result;
   }
 
   DateTime _addMonths(DateTime base, int monthsToAdd) {
@@ -661,6 +761,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDebtsBody(ColorScheme colorScheme, double netBalance) {
+    final filteredDebts = _filteredDebts;
+
     return RefreshIndicator(
       onRefresh: _loadDebts,
       child: CustomScrollView(
@@ -670,6 +772,9 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: _buildSummaryCard(colorScheme, netBalance),
             ),
+          ),
+          SliverToBoxAdapter(
+            child: _buildSearchAndSortRow(colorScheme),
           ),
           SliverToBoxAdapter(
             child: SingleChildScrollView(
@@ -706,7 +811,33 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          if (_filteredDebts.isEmpty)
+          if (_debts.isNotEmpty && _hasActiveFilters)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 2, 12, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${filteredDebts.length} ${filteredDebts.length == 1 ? 'result' : 'results'} • ${_sort.label}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: _resetFilters,
+                      child: const Text('Reset'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (filteredDebts.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
@@ -714,13 +845,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.account_balance_wallet_outlined,
+                      _debts.isNotEmpty
+                          ? Icons.search_off_rounded
+                          : Icons.account_balance_wallet_outlined,
                       size: 64,
                       color: colorScheme.outline.withAlpha(130),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No debt records found',
+                      _debts.isNotEmpty
+                          ? 'No matching records'
+                          : 'No debt records found',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
@@ -728,11 +863,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tap + Add Debt to create a new entry',
+                      _debts.isNotEmpty
+                          ? 'Try another search or clear your filters'
+                          : 'Tap + Add Debt to create a new entry',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: colorScheme.outline,
                           ),
                     ),
+                    if (_debts.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      TextButton.icon(
+                        onPressed: _resetFilters,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('Reset Filters'),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -741,12 +886,141 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               sliver: SliverList.separated(
-                itemCount: _filteredDebts.length,
+                itemCount: filteredDebts.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) =>
-                    _buildDebtCard(_filteredDebts[index]),
+                    _buildDebtCard(filteredDebts[index]),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchAndSortRow(ColorScheme colorScheme) {
+    final isNonDefaultSort = _sort != DebtSort.newest;
+    final borderSide = BorderSide(
+      color: colorScheme.outlineVariant.withAlpha(140),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              textInputAction: TextInputAction.search,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search name or note...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                isDense: true,
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest.withAlpha(110),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: borderSide,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: borderSide,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          PopupMenuButton<DebtSort>(
+            initialValue: _sort,
+            tooltip: 'Sort debts',
+            onSelected: (value) => setState(() => _sort = value),
+            itemBuilder: (context) => DebtSort.values.map((option) {
+              final selected = _sort == option;
+              return PopupMenuItem<DebtSort>(
+                value: option,
+                child: Row(
+                  children: [
+                    Icon(
+                      option.icon,
+                      size: 18,
+                      color: selected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        option.label,
+                        style: TextStyle(
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                          color: selected ? colorScheme.primary : null,
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: isNonDefaultSort
+                    ? colorScheme.secondaryContainer
+                    : colorScheme.surfaceContainerHighest.withAlpha(110),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isNonDefaultSort
+                      ? colorScheme.secondaryContainer
+                      : colorScheme.outlineVariant.withAlpha(140),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.swap_vert_rounded,
+                    size: 19,
+                    color: isNonDefaultSort
+                        ? colorScheme.onSecondaryContainer
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Sort',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isNonDefaultSort
+                          ? colorScheme.onSecondaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
