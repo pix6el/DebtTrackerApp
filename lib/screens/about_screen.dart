@@ -68,10 +68,10 @@ class _InstructionsTab extends StatelessWidget {
         const SizedBox(height: 12),
         const _StepCard(
           stepNumber: '2',
-          icon: Icons.filter_list_rounded,
-          title: 'Track Balances & Filter by Tag',
+          icon: Icons.manage_search_rounded,
+          title: 'Track, Search, Sort & Filter',
           description:
-              'The summary card at the top shows your live Net Position, total You Owe, and total Owed to Me. Combine the status chips (All, I Owe, Owed to Me, Settled) with the category tag row to quickly see where your money is going.',
+              'Search debts by person name, note, or tag, and sort by Soonest Due, Highest Balance, Newest, or Name (A–Z). Combine the status chips (All, I Owe, Owed to Me, Settled) with category tags to find records fast.',
         ),
         const SizedBox(height: 12),
         const _StepCard(
@@ -85,17 +85,17 @@ class _InstructionsTab extends StatelessWidget {
         const _StepCard(
           stepNumber: '4',
           icon: Icons.donut_large_rounded,
-          title: 'Use the Monthly Plan',
+          title: 'People Summary & Monthly Plan',
           description:
-              'Switch to the "Monthly" tab to visualize debts you owe by due date. View the donut breakdown for This Month, Next Month, and Incoming months, check the forecast bar chart, and review overdue or undated debts.',
+              'Use the "People" tab to view combined net balances and all records grouped by person. Switch to the "Monthly" tab for the donut breakdown across This Month, Next Month, and Incoming months, forecast chart, and category breakdown.',
         ),
         const SizedBox(height: 12),
         const _StepCard(
           stepNumber: '5',
-          icon: Icons.notifications_active_outlined,
-          title: 'Customize Reminders & Theme',
+          icon: Icons.settings_suggest_outlined,
+          title: 'Customize Reminders, Theme & Backups',
           description:
-              'Open the sidebar menu (☰) and tap "Settings" to switch between Light Mode, Dark Mode, or System Default, and configure offline due date reminders (1 day before and/or on the due date at 9:00 AM).',
+              'Open the sidebar menu (☰) and tap "Settings" to pick Light/Dark/System theme, set your custom daily due-date reminder time, and export or import .json backups anytime.',
         ),
         const SizedBox(height: 16),
         Container(
@@ -293,7 +293,14 @@ class _AboutTab extends StatelessWidget {
                 icon: Icons.notifications_active_outlined,
                 title: 'Offline Due Date Reminders',
                 subtitle:
-                    'Automatic 9:00 AM local notifications before and on your due dates so you never miss a payment.',
+                    'Customizable daily local notifications before and on your due dates so you never miss a payment.',
+              ),
+              Divider(height: 1, indent: 64),
+              _FeatureTile(
+                icon: Icons.backup_outlined,
+                title: 'Backup & Restore',
+                subtitle:
+                    'Export all records, payments, and preferences to a portable .json file and restore anytime.',
               ),
               Divider(height: 1, indent: 64),
               _FeatureTile(

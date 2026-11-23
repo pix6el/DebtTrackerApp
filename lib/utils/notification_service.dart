@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import '../data/db_helper.dart';
@@ -14,6 +15,7 @@ class NotificationService {
 
   static const String _enabledKey = 'reminders_enabled';
   static const String _timingKey = 'reminder_timing';
+  static const String _timeKey = 'reminder_time';
   static const String _channelId = 'debt_due_reminders';
   static const String _channelName = 'Debt Due Date Reminders';
   static const String _channelDescription =
@@ -25,6 +27,8 @@ class NotificationService {
   final ValueNotifier<bool> enabled = ValueNotifier<bool>(true);
   final ValueNotifier<ReminderTiming> timing =
       ValueNotifier<ReminderTiming>(ReminderTiming.both);
+  final ValueNotifier<TimeOfDay> reminderTime =
+      ValueNotifier<TimeOfDay>(const TimeOfDay(hour: 9, minute: 0));
 
   bool _initialized = false;
 
@@ -51,6 +55,9 @@ class NotificationService {
     final savedTiming = await DbHelper.instance.getSetting(_timingKey);
     timing.value = _timingFromString(savedTiming);
 
+    final savedTime = await DbHelper.instance.getSetting(_timeKey);
+    reminderTime.value = _timeFromString(savedTime);
+
     if (enabled.value) {
       await requestPermission();
       await rescheduleAllDebts();
@@ -63,6 +70,9 @@ class NotificationService {
 
     final savedTiming = await DbHelper.instance.getSetting(_timingKey);
     timing.value = _timingFromString(savedTiming);
+
+    final savedTime = await DbHelper.instance.getSetting(_timeKey);
+    reminderTime.value = _timeFromString(savedTime);
 
     if (!_initialized) return;
     if (enabled.value) {
@@ -105,6 +115,20 @@ class NotificationService {
     }
   }
 
+  Future<void> setReminderTime(TimeOfDay value) async {
+    reminderTime.value = value;
+    await DbHelper.instance.setSetting(_timeKey, _timeToString(value));
+
+    if (enabled.value) {
+      await rescheduleAllDebts();
+    }
+  }
+
+  String formattedReminderTime([TimeOfDay? value]) {
+    final t = value ?? reminderTime.value;
+    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, t.hour, t.minute));
+  }
+
   Future<void> syncDebtReminder(Debt debt) async {
     if (!_initialized || debt.id == null) return;
     await cancelDebtReminders(debt.id!);
@@ -117,11 +141,19 @@ class NotificationService {
     final isOwe = debt.type == DebtType.owe;
     final formattedAmount = Formatters.myr(debt.remainingAmount);
     final formattedDue = Formatters.date(due);
+    final hour = reminderTime.value.hour;
+    final minute = reminderTime.value.minute;
 
-    // 1 day before at 9:00 AM local time
+    // 1 day before at configured local time
     if (timing.value == ReminderTiming.both ||
         timing.value == ReminderTiming.dayBefore) {
-      final dayBefore = DateTime(due.year, due.month, due.day - 1, 9, 0);
+      final dayBefore = DateTime(
+        due.year,
+        due.month,
+        due.day - 1,
+        hour,
+        minute,
+      );
       await _scheduleOne(
         id: _dayBeforeId(debt.id!),
         scheduledLocalTime: dayBefore,
@@ -132,10 +164,10 @@ class NotificationService {
       );
     }
 
-    // On due date at 9:00 AM local time
+    // On due date at configured local time
     if (timing.value == ReminderTiming.both ||
         timing.value == ReminderTiming.onDueDate) {
-      final onDueDay = DateTime(due.year, due.month, due.day, 9, 0);
+      final onDueDay = DateTime(due.year, due.month, due.day, hour, minute);
       await _scheduleOne(
         id: _onDueDateId(debt.id!),
         scheduledLocalTime: onDueDay,
@@ -182,7 +214,7 @@ class NotificationService {
       await _plugin.show(
         999999,
         'Due Date Reminders Active',
-        'You will receive offline reminders at 9:00 AM before your debts are due.',
+        'You will receive offline reminders at ${formattedReminderTime()} before your debts are due.',
         _notificationDetails(),
       );
     } catch (_) {}
@@ -251,5 +283,30 @@ class NotificationService {
       case ReminderTiming.both:
         return 'both';
     }
+  }
+
+  static TimeOfDay _timeFromString(String? raw) {
+    if (raw != null && raw.contains(':')) {
+      final parts = raw.split(':');
+      if (parts.length == 2) {
+        final hour = int.tryParse(parts[0]);
+        final minute = int.tryParse(parts[1]);
+        if (hour != null &&
+            minute != null &&
+            hour >= 0 &&
+            hour <= 23 &&
+            minute >= 0 &&
+            minute <= 59) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+    }
+    return const TimeOfDay(hour: 9, minute: 0);
+  }
+
+  static String _timeToString(TimeOfDay time) {
+    final hh = time.hour.toString().padLeft(2, '0');
+    final mm = time.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
   }
 }

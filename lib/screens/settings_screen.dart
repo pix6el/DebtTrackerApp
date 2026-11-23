@@ -96,102 +96,171 @@ class SettingsScreen extends StatelessWidget {
                   return ValueListenableBuilder<ReminderTiming>(
                     valueListenable: NotificationService.instance.timing,
                     builder: (context, currentTiming, _) {
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: colorScheme.outlineVariant.withAlpha(140),
-                          ),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
+                      return ValueListenableBuilder<TimeOfDay>(
+                        valueListenable:
+                            NotificationService.instance.reminderTime,
+                        builder: (context, currentTime, _) {
+                          final timeLabel = NotificationService.instance
+                              .formattedReminderTime(currentTime);
+                          return Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color:
+                                    colorScheme.outlineVariant.withAlpha(140),
                               ),
-                              secondary: _iconBox(
-                                colorScheme,
-                                Icons.notifications_active_outlined,
-                              ),
-                              title: const Text(
-                                'Enable Reminders',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: const Text(
-                                'Offline local alerts at 9:00 AM for debts with due dates',
-                              ),
-                              value: remindersEnabled,
-                              onChanged: (value) async {
-                                await NotificationService.instance
-                                    .setEnabled(value);
-                              },
                             ),
-                            if (remindersEnabled) ...[
-                              const Divider(height: 1, indent: 68),
-                              _TimingOptionTile(
-                                title: '1 Day Before & On Due Date',
-                                subtitle: 'Get reminded the day before and on the due date',
-                                selected: currentTiming == ReminderTiming.both,
-                                onTap: () => NotificationService.instance
-                                    .setTiming(ReminderTiming.both),
-                              ),
-                              const Divider(height: 1, indent: 68),
-                              _TimingOptionTile(
-                                title: '1 Day Before Only',
-                                subtitle: 'Heads-up reminder the morning before it is due',
-                                selected:
-                                    currentTiming == ReminderTiming.dayBefore,
-                                onTap: () => NotificationService.instance
-                                    .setTiming(ReminderTiming.dayBefore),
-                              ),
-                              const Divider(height: 1, indent: 68),
-                              _TimingOptionTile(
-                                title: 'On Due Date Only',
-                                subtitle: 'Single reminder on the morning of the due date',
-                                selected:
-                                    currentTiming == ReminderTiming.onDueDate,
-                                onTap: () => NotificationService.instance
-                                    .setTiming(ReminderTiming.onDueDate),
-                              ),
-                              const Divider(height: 1, indent: 68),
-                              ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 4,
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              children: [
+                                SwitchListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 6,
+                                  ),
+                                  secondary: _iconBox(
+                                    colorScheme,
+                                    Icons.notifications_active_outlined,
+                                  ),
+                                  title: const Text(
+                                    'Enable Reminders',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: Text(
+                                    'Offline local alerts at $timeLabel for debts with due dates',
+                                  ),
+                                  value: remindersEnabled,
+                                  onChanged: (value) async {
+                                    await NotificationService.instance
+                                        .setEnabled(value);
+                                  },
                                 ),
-                                leading: _iconBox(
-                                  colorScheme,
-                                  Icons.send_outlined,
-                                ),
-                                title: const Text(
-                                  'Send Test Notification',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: const Text(
-                                  'Verify reminders work on this device',
-                                ),
-                                trailing: const Icon(
-                                  Icons.chevron_right_rounded,
-                                ),
-                                onTap: () async {
-                                  await NotificationService.instance
-                                      .sendTestNotification();
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Test notification sent'),
-                                        behavior: SnackBarBehavior.floating,
+                                if (remindersEnabled) ...[
+                                  const Divider(height: 1, indent: 68),
+                                  ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 4,
+                                    ),
+                                    leading: _iconBox(
+                                      colorScheme,
+                                      Icons.access_time_rounded,
+                                    ),
+                                    title: const Text(
+                                      'Reminder Time',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
+                                    ),
+                                    subtitle: const Text(
+                                      'Daily alert time for due date reminders',
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.primaryContainer
+                                                .withAlpha(140),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            timeLabel,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: colorScheme.primary,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.chevron_right_rounded),
+                                      ],
+                                    ),
+                                    onTap: () => _pickReminderTime(
+                                      context,
+                                      currentTime,
+                                    ),
+                                  ),
+                                  const Divider(height: 1, indent: 68),
+                                  _TimingOptionTile(
+                                    title: '1 Day Before & On Due Date',
+                                    subtitle:
+                                        'Get reminded the day before and on the due date',
+                                    selected:
+                                        currentTiming == ReminderTiming.both,
+                                    onTap: () => NotificationService.instance
+                                        .setTiming(ReminderTiming.both),
+                                  ),
+                                  const Divider(height: 1, indent: 68),
+                                  _TimingOptionTile(
+                                    title: '1 Day Before Only',
+                                    subtitle:
+                                        'Heads-up reminder the day before at $timeLabel',
+                                    selected: currentTiming ==
+                                        ReminderTiming.dayBefore,
+                                    onTap: () => NotificationService.instance
+                                        .setTiming(ReminderTiming.dayBefore),
+                                  ),
+                                  const Divider(height: 1, indent: 68),
+                                  _TimingOptionTile(
+                                    title: 'On Due Date Only',
+                                    subtitle:
+                                        'Single reminder on the due date at $timeLabel',
+                                    selected: currentTiming ==
+                                        ReminderTiming.onDueDate,
+                                    onTap: () => NotificationService.instance
+                                        .setTiming(ReminderTiming.onDueDate),
+                                  ),
+                                  const Divider(height: 1, indent: 68),
+                                  ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 4,
+                                    ),
+                                    leading: _iconBox(
+                                      colorScheme,
+                                      Icons.send_outlined,
+                                    ),
+                                    title: const Text(
+                                      'Send Test Notification',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: const Text(
+                                      'Verify reminders work on this device',
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                    ),
+                                    onTap: () async {
+                                      await NotificationService.instance
+                                          .sendTestNotification();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content:
+                                                Text('Test notification sent'),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -395,6 +464,24 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: isError ? colorScheme.error : null,
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  Future<void> _pickReminderTime(
+    BuildContext context,
+    TimeOfDay currentTime,
+  ) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: currentTime,
+    );
+    if (picked == null) return;
+
+    await NotificationService.instance.setReminderTime(picked);
+    if (!context.mounted) return;
+    _showSnackBar(
+      context,
+      'Reminder time updated to ${NotificationService.instance.formattedReminderTime(picked)}',
     );
   }
 
